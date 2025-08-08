@@ -13,7 +13,7 @@
                         <td>{$row['name']}</td>
                         <td>{$row['category']}</td>
                         <td>{$row['stock']}</td>
-                        <td>{$row['image']}</td>
+                <td><img src='uploads/{$row['image']}' width='100'></td>
                         <td>{$row['price']}</td>
                         <td>
                             <a href='edit_part.php?id={$row['id']}' class='btn btn-warning btn-sm'>Edit</a>

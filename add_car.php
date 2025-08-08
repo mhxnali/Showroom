@@ -1,4 +1,4 @@
-<?php include 'dashboard.php'; ?>
+<?php include 'dashboard.php'; ?>include 
 <?php include 'db.php'; ?> <!-- Make sure DB connection is included -->
 
 <?php
@@ -43,7 +43,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <input type="text" name="carname" class="form-control" placeholder="Car Name" required>
         </div>
         <div class="mb-3">
-            <input type="text" name="engine" class="form-control" placeholder="Engine" required>
+                         <select name="engine" class="form-control">
+                        <option value="">select option</option>
+                        <option value="800cc">800cc</option>
+                        <option value="1000cc">1000cc</option>
+                        <option value="1300cc">1300cc</option>
+                        <option value="1500cc">1500cc</option>
+                        <option value="1800cc">1800cc</option>
+                        <option value="2000cc">2000cc</option>
+                        <option value="2800cc">2800cc</option>
+                        <option value="3500cc">3500cc</option>
+
         </div>
         <div class="mb-3">
             <input type="text" name="model" class="form-control" placeholder="Model" required>
