@@ -83,6 +83,8 @@
     <a href="sales.php">💰 Sales</a>
     <a href="users.php">👥 Manage Users</a>
     <a href="booking.php">📞Booking</a>
+    <!-- New Services Link -->
+    <a href="services.php">🛎️ Services</a>
     <a href="logout.php" class="text-danger">🚪 Logout</a>
 </div>
 

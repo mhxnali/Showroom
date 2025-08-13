@@ -1,12 +1,14 @@
- db.php
 <?php
-$host = "localhost";
-$user = "root";
-$pass = "";
-$db = "showroom";
+// db.php - sample. Replace credentials if needed.
+$servername = "localhost";
+$username = "root";
+$password = "";
+$dbname = "showroom";
 
-$conn = new mysqli($host, $user, $pass, $db);
+$conn = new mysqli($servername, $username, $password, $dbname);
 if ($conn->connect_error) {
-die("Connection failed: " . $conn->connect_error);
+    die("DB connection failed: " . $conn->connect_error);
 }
+
+$conn->set_charset("utf8mb4");
 ?>
