@@ -1,139 +1,200 @@
+
 <?php
-$cars = [
-    ["name" => "BMW M4-Comp", "price" => "$55,000", "image" => "assets/images/car1.jpeg", "category" => "Sports"],
-    ["name" => "Mercedes G-Wagon", "price" => "$60,000", "image" => "assets/images/car2.jpeg", "category" => "SUV"],
-    ["name" => "Mercedes C-Class", "price" => "$45,000", "image" => "assets/images/car3.jpeg", "category" => "Sedan"],
-    ["name" => "Porsche 911", "price" => "$120,000", "image" => "assets/images/car4.jpeg", "category" => "Sports"],
-];
+include 'db.php';
+
+// Handle form submission
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['place_order'])) {
+
+    // Get user input
+    $buyerName  = trim($_POST['buyerName'] ?? '');
+    $buyerPhone = trim($_POST['buyerPhone'] ?? '');
+    $carName    = trim($_POST['carName'] ?? '');
+    $carModel   = trim($_POST['carModel'] ?? '');
+    $engineCC   = trim($_POST['engineCC'] ?? '');
+    $carPrice   = trim($_POST['carPrice'] ?? '');
+    $carImage   = trim($_POST['carImage'] ?? '');
+
+    // Prepare invoice variables
+    $invoice_no    = 'INV-' . time();
+    $invoice_date  = date('Y-m-d');
+    $payment_terms = '';
+    $due_date      = '';
+    $po_number     = '';
+    $subtotal      = $carPrice;
+    $tax           = 0;
+    
+    $amount_paid   = $subtotal;
+    $balance_due   = 0;
+    $date          = date('Y-m-d');
+    $types         = 'Car Purchase';
+    $pay_type      = $buyerPhone; // storing phone/payment method
+    $itemsArray    = [
+        [
+            "item" => $carName,
+            "model" => $carModel,
+            "engine_cc" => $engineCC,
+            "price" => $carPrice,
+            "quantity" => 1,
+            "amount" => $carPrice
+        ]
+    ];
+    $itemsJson = json_encode($itemsArray);
+    $from_who = '';
+    $notes = '';
+    $terms = '';
+
+    // Prepare and execute insert
+    $stmt = $conn->prepare("INSERT INTO invoices (invoice_no, invoice_date, bill_to, ship_to, payment_terms, due_date, po_number, subtotal, tax, total, amount_paid, balance_due, date, name, types, product, pay_type, price, items, from_who, notes, terms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param(
+        "ssssssssddddsssssdssss",
+        $invoice_no, $invoice_date, $buyerName, $buyerName, $payment_terms, $due_date, $po_number,
+        $subtotal, $tax, $total, $amount_paid, $balance_due, $date,
+        $buyerName, $types, $carName, $pay_type, $carPrice, $itemsJson, $from_who, $notes, $terms
+    );
+    if ($stmt->execute()) {
+        $success = "Purchase saved successfully!";
+    } else {
+        $error = "Error: " . $stmt->error;
+    }
+}
+
+// Fetch cars from database
+$cars = [];
+$sql = "SELECT * FROM cars ORDER BY id DESC";
+$result = $conn->query($sql);
+if ($result->num_rows > 0) {
+    while ($row = $result->fetch_assoc()) {
+        $cars[] = $row;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Car Showroom</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://unpkg.com/aos@2.3.4/dist/aos.css" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/style.css">
-    <style>
-        .card img {
-            height: 200px;
-            object-fit: cover;
-            transition: transform 0.3s ease;
-        }
-        .card:hover img {
-            transform: scale(1.05);
-        }
-        .btn-custom {
-            width: 48%;
-        }
-        /* Animation for car names */
-        .animated-name {
-            display: inline-block;
-            animation: namePulse 2s infinite ease-in-out;
-        }
-        @keyframes namePulse {
-            0%, 100% { transform: scale(1); color: #000; }
-            50% { transform: scale(1.08); color: #f8c146; }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Car Showroom</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+.card img { height: 200px; object-fit: cover; transition: transform 0.3s; }
+.card:hover img { transform: scale(1.05); }
+.btn-buy { background-color: #28a745; color: white; font-weight: bold; padding: 10px 20px; border-radius: 25px; }
+.btn-buy:hover { background-color: #218838; }
+</style>
 </head>
 <body>
-
 <?php include 'navbar.php'; ?>
-
-<!-- Hero -->
+<!-- Hero Section -->
 <section class="hero text-center text-white" 
-    style="position: relative; height: 300px; display: flex; flex-direction: column; justify-content: center; background: url('assets/images/hero.jpeg') center/cover;">
+         style="position: relative; height: 300px; display: flex; flex-direction: column; justify-content: center; background: url('assets/images/hero.jpeg') center/cover;">
     <div style="position:absolute; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.4);"></div>
     <h1 style="position:relative; z-index:1;">Welcome to Our Showroom</h1>
     <p style="position:relative; z-index:1;">Find your dream car today</p>
     <a href="services.php" class="btn btn-warning text-dark" style="position:relative; z-index:1;">Explore Services</a>
 </section>
 
-<!-- Search & Filter -->
-<div class="container my-4">
-    <div class="row g-2">
-        <div class="col-md-6">
-            <input type="text" id="searchBox" class="form-control" placeholder="Search for a car...">
-        </div>
-        <div class="col-md-6 text-md-end">
-            <button class="btn btn-outline-primary filter-btn" data-category="All">All</button>
-            <button class="btn btn-outline-primary filter-btn" data-category="SUV">SUV</button>
-            <button class="btn btn-outline-primary filter-btn" data-category="Sedan">Sedan</button>
-            <button class="btn btn-outline-primary filter-btn" data-category="Sports">Sports</button>
-        </div>
-    </div>
-</div>
 
-<!-- Featured Cars -->
 <div class="container my-5">
-    <h2 class="mb-4">Featured Cars</h2>
-    <div class="row" id="carList">
-        <?php 
-        $delay = 0; 
-         include 'db.php';
+    <h2 class="mb-4 text-center">Featured Cars</h2>
 
-      $sql = "SELECT * FROM cars ORDER BY id DESC";
-      $result = $conn->query($sql);
+    <?php if(!empty($success)): ?>
+        <div class="alert alert-success"><?= htmlspecialchars($success) ?></div>
+    <?php endif; ?>
+    <?php if(!empty($error)): ?>
+        <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
+    <?php endif; ?>
 
-        if ($result->num_rows > 0) {
-            while ($car = $result->fetch_assoc()) {
-
-        ?>
-        <div class="col-12 col-sm-6 col-md-4 col-lg-3 mb-4 car-item" 
-             data-name="<?= $car['name'] ?>" 
-             data-model="<?= strtolower($car['model']) ?>"
-             data-aos="fade-up" 
-             data-aos-duration="800" 
-             data-aos-delay="<?= $delay ?>">
-            <div class="card h-100 shadow-sm border-0">
-              <img src="admin/uploads/<?= $car['image'] ?>" class="card-img-top" alt="<?= $car['name'] ?>">
-                <div class="card-body text-center">
-                    <h5 class="card-title animated-name"><?= $car['name'] ?></h5>
-                    <p class="card-text text-muted"><?= $car['price'] ?></p>
-                    <div class="d-flex justify-content-between">
-                        <a href="book.php?car=<?= urlencode($car['name']) ?>" class="btn btn-warning btn-sm btn-custom">Book Now</a>
-                        <a href="buy.php?car=<?= urlencode($car['name']) ?>" class="btn btn-success btn-sm btn-custom">Buy Now</a>
+    <div class="row">
+        <?php foreach($cars as $car): ?>
+            <div class="col-md-4 mb-4">
+                <div class="card shadow-sm">
+                    <img src="admin/uploads/<?= $car['image'] ?>" class="card-img-top" alt="<?= $car['name'] ?>">
+                    <div class="card-body text-center">
+                        <h5 class="card-title"><?= $car['name'] ?></h5>
+                        <p class="text-muted"><?= $car['model'] ?> | <?= $car['engine_cc'] ?> cc</p>
+                        <p class="fw-bold"><?= $car['price'] ?> PKR</p>
+                        <button class="btn btn-buy" 
+                            data-bs-toggle="modal" 
+                            data-bs-target="#buyModal"
+                            data-name="<?= htmlspecialchars($car['name']) ?>"
+                            data-model="<?= htmlspecialchars($car['model']) ?>"
+                            data-engine="<?= htmlspecialchars($car['engine_cc']) ?>"
+                            data-price="<?= htmlspecialchars($car['price']) ?>"
+                            data-image="<?= htmlspecialchars($car['image']) ?>">
+                            Buy / Book Now
+                        </button>
                     </div>
                 </div>
             </div>
-        </div>
-        <?php 
-            $delay += 100; // Stagger animation for each card
-        } }
-        ?>
+        <?php endforeach; ?>
     </div>
 </div>
 
-<!-- Footer -->
-<footer class="bg-dark text-white text-center py-3">
-    &copy; <?= date("Y") ?> Car Showroom. All rights reserved.
-</footer>
+<!-- Modal -->
+<div class="modal fade" id="buyModal" tabindex="-1" aria-labelledby="buyModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST">
+        <input type="hidden" name="place_order" value="1">
+        <input type="hidden" name="carName" id="carName">
+        <input type="hidden" name="carModel" id="carModel">
+        <input type="hidden" name="engineCC" id="engineCC">
+        <input type="hidden" name="carPrice" id="carPrice">
+        <input type="hidden" name="carImage" id="carImage">
+        <div class="modal-header">
+          <h5 class="modal-title" id="buyModalLabel">Buy / Book Car</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body text-center">
+            <img id="modalCarImage" src="" class="img-fluid mb-3" style="max-height:200px;">
+            <h5 id="modalCarName"></h5>
+            <p id="modalCarDetails" class="text-muted"></p>
+            <p id="modalCarPrice" class="fw-bold"></p>
+
+            <div class="mb-3">
+                <label>Your Name</label>
+                <input type="text" name="buyerName" class="form-control" required>
+            </div>
+            <div class="mb-3">
+                <label>Phone / Payment Method</label>
+                <input type="text" name="buyerPhone" class="form-control" required placeholder="Cash / Card / Online">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="submit" class="btn btn-success">Submit Order</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script>
 <script>
-    AOS.init({ once: true });
+document.addEventListener('DOMContentLoaded', function() {
+    var buyModal = document.getElementById('buyModal');
 
-    $("#searchBox").on("keyup", function() {
-        var value = $(this).val().toLowerCase();
-        $(".car-item").filter(function() {
-            $(this).toggle($(this).data("name").indexOf(value) > -1);
-        });
-    });
+    buyModal.addEventListener('show.bs.modal', function(event) {
+        var button = event.relatedTarget;
+        var name = button.getAttribute('data-name');
+        var model = button.getAttribute('data-model');
+        var engine = button.getAttribute('data-engine');
+        var price = button.getAttribute('data-price');
+        var image = button.getAttribute('data-image');
 
-    $(".filter-btn").on("click", function() {
-        var category = $(this).data("category");
-        if (category === "All") {
-            $(".car-item").show();
-        } else {
-            $(".car-item").hide().filter(function() {
-                return $(this).data("category") === category;
-            }).show();
-        }
+        document.getElementById('carName').value = name;
+        document.getElementById('carModel').value = model;
+        document.getElementById('engineCC').value = engine;
+        document.getElementById('carPrice').value = price;
+        document.getElementById('carImage').value = image;
+
+        document.getElementById('modalCarName').innerText = name;
+        document.getElementById('modalCarDetails').innerText = model + " | " + engine + " cc";
+        document.getElementById('modalCarPrice').innerText = price + " PKR";
+        document.getElementById('modalCarImage').src = "admin/uploads/" + image;
     });
+});
 </script>
+
 </body>
 </html>

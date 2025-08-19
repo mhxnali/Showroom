@@ -1,4 +1,28 @@
 <?php
+include 'db.php';
+
+// Handle booking form submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['book_service'])) {
+    $name         = $_POST['name'];
+    $contact      = $_POST['contact'];
+    $booking_type = $_POST['booking_type'];
+    $pref_time    = $_POST['pref_time'];
+    $adv_pay      = $_POST['adv_pay'];
+    $pay_mode     = $_POST['pay_mode'];
+
+    $stmt = $conn->prepare("INSERT INTO booking (name, contact, booking_type, pref_time, adv_pay, pay_mode) VALUES (?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("ssssss", $name, $contact, $booking_type, $pref_time, $adv_pay, $pay_mode);
+    if ($stmt->execute()) {
+        header("Location: admin/booking.php");
+        exit;
+    } else {
+        echo "<script>alert('Error booking service.');</script>";
+    }
+    $stmt->close();
+}
+?>
+
+<?php
 // Purely front-end example
 $services = [
     "Oil Change" => "oil-change.jpeg",
@@ -62,8 +86,6 @@ $services = [
     <h1 class="text-center mb-4">Explore Our Premium Services</h1>
     <div class="row g-4">
 <?php
-include 'db.php';
-
 $sql = "SELECT * FROM services ORDER BY id DESC";
 $result = $conn->query($sql);
 
@@ -71,7 +93,7 @@ if ($result->num_rows > 0) {
     while ($part = $result->fetch_assoc()) {
         $name = htmlspecialchars($part['name']);
         $image = htmlspecialchars($part['image']);
-        $imgPath = "admin/uploads/" . $image; // adjust path if needed
+        $imgPath = "admin/uploads/" . $image;
 
         echo "
         <div class='col-sm-6 col-md-4 col-lg-3'>
@@ -86,8 +108,6 @@ if ($result->num_rows > 0) {
     }
 }
 ?>
-
-        ?>
     </div>
 </div>
 
@@ -100,20 +120,24 @@ if ($result->num_rows > 0) {
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <form>
-                    <input type="text" class="form-control mb-2" placeholder="Full Name" required>
-                    <input type="tel" class="form-control mb-2" placeholder="Phone Number" required>
-                    <input type="email" class="form-control mb-2" placeholder="Email Address" required>
-                    <select id="serviceDropdown" class="form-select mb-2">
+                <form method="POST">
+                    <input type="text" name="name" class="form-control mb-2" placeholder="Full Name" required>
+                    <input type="text" name="contact" class="form-control mb-2" placeholder="Contact Number" required>
+                    <select id="serviceDropdown" name="booking_type" class="form-select mb-2" required>
                         <?php
                         foreach ($services as $name => $image) {
                             echo "<option value='$name'>$name</option>";
                         }
                         ?>
                     </select>
-                    <input type="date" class="form-control mb-2" required>
-                    <input type="time" class="form-control mb-3" required>
-                    <button type="submit" class="btn btn-orange w-100">Confirm Booking</button>
+                    <input type="datetime-local" name="pref_time" class="form-control mb-2" required>
+                    <input type="text" name="adv_pay" class="form-control mb-2" placeholder="Advance Payment" required>
+                    <select name="pay_mode" class="form-select mb-3" required>
+                        <option value="Cash">Cash</option>
+                        <option value="Card">Card</option>
+                        <option value="Online Banking">Online Banking</option>
+                    </select>
+                    <button type="submit" name="book_service" class="btn btn-orange w-100">Confirm Booking</button>
                 </form>
             </div>
         </div>

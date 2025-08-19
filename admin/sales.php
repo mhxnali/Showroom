@@ -16,7 +16,7 @@ $result = $conn->query($sql);
                 <th>Date</th>
                 <th>Customer Name</th>
                 <th>Type</th>
-                <th>Payment Method</th>
+                <th>Pay_type</th>
                 <th>Price (PKR)</th>
                 <th>Action</th>
             </tr>
