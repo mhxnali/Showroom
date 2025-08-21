@@ -20,14 +20,12 @@
             animation: gradientShift 20s ease infinite;
         }
 
-        /* Smooth background animation */
         @keyframes gradientShift {
             0% { background-position: 0% 50%; }
             50% { background-position: 100% 50%; }
             100% { background-position: 0% 50%; }
         }
 
-        /* Glass effect for sidebar */
         .sidebar {
             width: 250px;
             height: 100vh;
@@ -55,12 +53,6 @@
             border-radius: 8px;
         }
 
-        /* Navbar with glass look */
-        .navbar {
-            backdrop-filter: blur(12px);
-            background: rgba(0, 0, 0, 0.6) !important;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.15);
-        }
         .navbar-brand {
             font-weight: 600;
             font-size: 18px;
@@ -68,7 +60,6 @@
             letter-spacing: 0.5px;
         }
 
-        /* Main content with smooth fade */
         .main-content {
             margin-left: 250px;
             margin-top: 56px;
@@ -84,22 +75,40 @@
             text-shadow: 0 1px 4px rgba(0,0,0,0.3);
         }
 
-        /* Fade animation */
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(12px); }
             to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Navbar link hover effect */
+        .navbar-nav .nav-link {
+            transition: color 0.3s ease, transform 0.2s ease;
+        }
+        .navbar-nav .nav-link:hover {
+            color: #f8c146 !important;
+            transform: translateY(-2px);
         }
     </style>
 </head>
 <body>
 
-<!-- Navbar -->
-<nav class="navbar navbar-dark fixed-top shadow-sm">
-    <div class="container-fluid d-flex justify-content-between">
-        <a class="navbar-brand" href="#">🚘 Showroom</a>
-        <div class="d-flex align-items-center gap-3">
-            <a class="nav-link text-light" href="#">Profile</a>
-            <a class="nav-link text-danger" href="logout.php">Logout</a>
+<!-- Updated Navbar -->
+<nav class="navbar navbar-expand-lg navbar-dark fixed-top shadow-sm" style="backdrop-filter: blur(12px); background: rgba(0, 0, 0, 0.6); border-bottom: 1px solid rgba(255,255,255,0.15);">
+    <div class="container-fluid">
+        <!-- Brand -->
+        <a class="navbar-brand fw-bold" href="#">Showroom Dashboard</a>
+
+        <!-- Toggler for mobile -->
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#dashboardNavbar" aria-controls="dashboardNavbar" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <!-- Navbar Links -->
+        <div class="collapse navbar-collapse" id="dashboardNavbar">
+            <ul class="navbar-nav ms-auto align-items-center">
+                <li class="nav-item"><a class="nav-link text-light" href="#">Profile</a></li>
+                <li class="nav-item"><a class="nav-link text-danger" href="logout.php">Logout</a></li>
+            </ul>
         </div>
     </div>
 </nav>
@@ -114,7 +123,6 @@
     <a href="users.php">👥 Manage Users</a>
     <a href="booking.php">📞 Booking</a>
     <a href="services.php">🛎️ Services</a>
-      <!-- ✅ New Reports Link -->
     <a href="reports.php">📊 Reports</a>
     <a href="logout.php" class="text-danger">🚪 Logout</a>
 </div>
@@ -136,5 +144,6 @@
     ?>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
