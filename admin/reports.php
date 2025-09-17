@@ -1,243 +1,335 @@
-<?php 
+<?php  
 include 'dashboard.php'; 
 include 'db.php';
+include 'car_financials.php'; // Include the car financial data
 
 $report = $_GET['report'] ?? 'all';
-?>
+$page   = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$limit  = 5;
+$offset = ($page - 1) * $limit;
 
+// Date filters
+$start_date = $_GET['start_date'] ?? '';
+$end_date   = $_GET['end_date'] ?? '';
+$dateFilter = "";
+
+// Apply date filter if values are provided
+if (!empty($start_date) && !empty($end_date)) {
+    $dateFilter = " WHERE created_at BETWEEN '$start_date 00:00:00' AND '$end_date 23:59:59' ";
+} elseif (!empty($start_date)) {
+    $dateFilter = " WHERE created_at >= '$start_date 00:00:00' ";
+} elseif (!empty($end_date)) {
+    $dateFilter = " WHERE created_at <= '$end_date 23:59:59' ";
+}
+
+// Switch tables based on report type
+switch ($report) {
+    case 'cars':
+        $query = "SELECT * FROM cars $dateFilter ORDER BY id DESC LIMIT $limit OFFSET $offset";
+        $countQuery = "SELECT COUNT(*) as total FROM cars $dateFilter";
+        $columns = ['ID','Name','Model','Engine CC','Price','Image','Added On'];
+        break;
+    case 'cars_profitloss':
+        // Fetch cars data with date filter
+        $query = "SELECT * FROM cars $dateFilter ORDER BY id DESC LIMIT $limit OFFSET $offset";
+        $countQuery = "SELECT COUNT(*) as total FROM cars $dateFilter";
+        $columns = ['ID','Name','Model','Engine CC','Selling Price','Actual Cost','Commission','Profit/Loss','Image','Added On'];
+        break;
+    case 'sales':
+        $query = "SELECT * FROM sales $dateFilter ORDER BY id DESC LIMIT $limit OFFSET $offset";
+        $countQuery = "SELECT COUNT(*) as total FROM sales $dateFilter";
+        $columns = ['ID','Date','Name','Types','Product','Price','Pay Type'];
+        break;
+    case 'customers':
+        $query = "SELECT * FROM customer $dateFilter ORDER BY id DESC LIMIT $limit OFFSET $offset";
+        $countQuery = "SELECT COUNT(*) as total FROM customer $dateFilter";
+        $columns = ['ID','Name','Email','Contact','Address'];
+        break;
+    case 'booking':
+        $query = "SELECT * FROM booking $dateFilter ORDER BY id DESC LIMIT $limit OFFSET $offset";
+        $countQuery = "SELECT COUNT(*) as total FROM booking $dateFilter";
+        $columns = ['ID','Name','Contact','Booking Type','Preferred Time','Advance Pay','Pay Mode'];
+        break;
+    case 'services':
+        $query = "SELECT * FROM services $dateFilter ORDER BY id DESC LIMIT $limit OFFSET $offset";
+        $countQuery = "SELECT COUNT(*) as total FROM services $dateFilter";
+        $columns = ['ID','Name','Category','Description','Price','Image','Created At'];
+        break;
+    case 'spareparts':
+        $query = "SELECT * FROM spare_parts $dateFilter ORDER BY id DESC LIMIT $limit OFFSET $offset";
+        $countQuery = "SELECT COUNT(*) as total FROM spare_parts $dateFilter";
+        $columns = ['ID','Name','Category','Price','Stock','Image'];
+        break;
+    case 'profitloss':
+        // Calculate profit and loss using actual financial data
+        $columns = ['Category', 'Revenue', 'Cost', 'Commission', 'Profit/Loss'];
+        
+        // Fetch data from relevant tables
+        $carsQuery = "SELECT id, price FROM cars $dateFilter";
+        $servicesQuery = "SELECT price FROM services $dateFilter";
+        $sparepartsQuery = "SELECT price FROM spare_parts $dateFilter";
+        
+        $carsResult = mysqli_query($conn, $carsQuery);
+        $servicesResult = mysqli_query($conn, $servicesQuery);
+        $sparepartsResult = mysqli_query($conn, $sparepartsQuery);
+        
+        // Initialize variables
+        $carsRevenue = 0;
+        $carsCost = 0;
+        $carsCommission = 0;
+        
+        $servicesRevenue = 0;
+        $servicesCost = 0;
+        $servicesCommission = 0;
+        
+        $sparepartsRevenue = 0;
+        $sparepartsCost = 0;
+        $sparepartsCommission = 0;
+        
+        // Calculate actual revenue, cost, and commission for cars
+        while ($row = mysqli_fetch_assoc($carsResult)) {
+            $carId = $row['id'];
+            $price = floatval($row['price']);
+            
+            // Get cost and commission from configuration
+            if (isset($carFinancials[$carId])) {
+                $costPrice = $carFinancials[$carId]['cost'];
+                $commission = $carFinancials[$carId]['commission'];
+            } else {
+                // Fallback if not in configuration
+                $costPrice = $price * 0.70;
+                $commission = $price * 0.05;
+            }
+            
+            $carsRevenue += $price;
+            $carsCost += $costPrice;
+            $carsCommission += $commission;
+        }
+        
+        // Calculate actual revenue, cost, and commission for services
+        while ($row = mysqli_fetch_assoc($servicesResult)) {
+            $price = isset($row['price']) ? floatval($row['price']) : 0;
+            $costPrice = $price * 0.40; // 40% of revenue is cost
+            $commission = $price * 0.10; // 10% commission
+            
+            $servicesRevenue += $price;
+            $servicesCost += $costPrice;
+            $servicesCommission += $commission;
+        }
+        
+        // Calculate actual revenue, cost, and commission for spare parts
+        while ($row = mysqli_fetch_assoc($sparepartsResult)) {
+            $price = isset($row['price']) ? floatval($row['price']) : 0;
+            $costPrice = $price * 0.60; // 60% of revenue is cost
+            $commission = $price * 0.03; // 3% commission
+            
+            $sparepartsRevenue += $price;
+            $sparepartsCost += $costPrice;
+            $sparepartsCommission += $commission;
+        }
+        
+        // Calculate profit/loss for each category
+        $carsProfitLoss = $carsRevenue - $carsCost - $carsCommission;
+        $servicesProfitLoss = $servicesRevenue - $servicesCost - $servicesCommission;
+        $sparepartsProfitLoss = $sparepartsRevenue - $sparepartsCost - $sparepartsCommission;
+        
+        // Calculate totals
+        $totalRevenue = $carsRevenue + $servicesRevenue + $sparepartsRevenue;
+        $totalCost = $carsCost + $servicesCost + $sparepartsCost;
+        $totalCommission = $carsCommission + $servicesCommission + $sparepartsCommission;
+        $totalProfitLoss = $totalRevenue - $totalCost - $totalCommission;
+        
+        // Prepare report data
+        $profitLossData = [
+            [
+                'Category' => 'Cars',
+                'Revenue' => $carsRevenue,
+                'Cost' => $carsCost,
+                'Commission' => $carsCommission,
+                'Profit/Loss' => $carsProfitLoss
+            ],
+            [
+                'Category' => 'Services',
+                'Revenue' => $servicesRevenue,
+                'Cost' => $servicesCost,
+                'Commission' => $servicesCommission,
+                'Profit/Loss' => $servicesProfitLoss
+            ],
+            [
+                'Category' => 'Spare Parts',
+                'Revenue' => $sparepartsRevenue,
+                'Cost' => $sparepartsCost,
+                'Commission' => $sparepartsCommission,
+                'Profit/Loss' => $sparepartsProfitLoss
+            ],
+            [
+                'Category' => 'TOTAL',
+                'Revenue' => $totalRevenue,
+                'Cost' => $totalCost,
+                'Commission' => $totalCommission,
+                'Profit/Loss' => $totalProfitLoss
+            ]
+        ];
+        
+        // Set total pages to 1 since we're not paginating this report
+        $totalPages = 1;
+        break;
+    default:
+        $query = "SELECT * FROM services $dateFilter ORDER BY id DESC LIMIT $limit OFFSET $offset";
+        $countQuery = "SELECT COUNT(*) as total FROM services $dateFilter";
+        $columns = ['ID','Name','Category','Description','Price','Image','Created At'];
+        break;
+}
+
+// Execute queries for non-profitloss reports
+if ($report !== 'profitloss' && $report !== 'cars_profitloss') {
+    $result = mysqli_query($conn, $query);
+    $countResult = mysqli_query($conn, $countQuery);
+    $totalRows = mysqli_fetch_assoc($countResult)['total'];
+    $totalPages = ceil($totalRows / $limit);
+} elseif ($report === 'cars_profitloss') {
+    $result = mysqli_query($conn, $query);
+    $countResult = mysqli_query($conn, $countQuery);
+    $totalRows = mysqli_fetch_assoc($countResult)['total'];
+    $totalPages = ceil($totalRows / $limit);
+}
+?>
 <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
 <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-    AOS.init({ duration: 800, once: true });
-
-    // Animate progress bars
-    document.querySelectorAll(".progress-bar").forEach(function(bar) {
-        let finalWidth = bar.getAttribute("data-width");
-        if (!finalWidth) return;
-        bar.style.width = "0%";
-        setTimeout(() => { bar.style.width = finalWidth; }, 300);
-    });
-
-    // 🔍 Global Search across all visible tables
-    document.getElementById("globalSearch").addEventListener("keyup", function() {
-        let value = this.value.toLowerCase();
-        document.querySelectorAll("table tbody tr").forEach(row => {
-            row.style.display = row.innerText.toLowerCase().includes(value) ? "" : "none";
-        });
-    });
-
-    // 📅 Show/Hide Date Filters (only for All Reports)
-    let dateFilters = document.getElementById("dateFilters");
-    if ("<?= $report ?>" === "all") {
-        dateFilters.style.display = "flex";
-    } else {
-        dateFilters.style.display = "none";
-    }
-});
-</script>
-
-<style>
-.progress { border-radius: 50px; overflow: hidden; margin-bottom: 15px; }
-.progress-bar { transition: width 1.5s ease-in-out; border-radius: 50px; font-weight: bold; color:#fff;}
-.report-btn.active { opacity: 1; transform: scale(1.05); box-shadow: 0 0 12px rgba(0,0,0,0.25); background-color: #343a40 !important; color:#fff !important;}
-.report-btn { opacity: 0.85; transition: all 0.3s ease-in-out; }
-.table-hover tbody tr:hover { background-color: rgba(0,123,255,0.1); }
-#globalSearch { max-width: 300px; }
-#dateFilters { gap: 10px; display: none; }
-
-/* 🔥 Professional Styling */
-.filters-box {
-    background: #ffffff;
-    border: 1px solid #dee2e6;
-    border-radius: 12px;
-    padding: 15px;
-    box-shadow: 0px 2px 6px rgba(0,0,0,0.1);
-}
-.filters-box input,
-.filters-box .btn {
-    min-width: 120px;
-}
-
-/* 📊 Reports Heading Styling */
-h2.page-heading {
-    font-weight: 900;
-    font-size: 46px;                 /* Bigger size */
-    color: #ffffff;                  /* Pure white */
-    text-shadow: 3px 3px 8px rgba(0,0,0,0.8); /* Strong readability on dark green */
-    letter-spacing: 1.5px;
-    margin-bottom: 25px;
-}
-</style>
-
 <div class="main-content">
-    
-    <!-- Heading moved UP separately -->
-    <div class="mb-4 text-center">
-        <h2 class="page-heading" data-aos="fade-down">📊 REPORTS</h2>
+    <h1 class="text-center mb-4">Welcome to Showroom Dashboard</h1>
+    <h2 class="text-center mb-4">Reports</h2>
+    <!-- Report Buttons -->
+    <div class="d-flex justify-content-center gap-2 mb-4 flex-wrap">
+        <a href="reports.php?report=cars" class="btn btn-primary">Cars</a>
+        <a href="reports.php?report=cars_profitloss" class="btn btn-info">Cars Profit & Loss</a>
+        <a href="reports.php?report=sales" class="btn btn-primary">Sales</a>
+        <a href="reports.php?report=customers" class="btn btn-primary">Customers</a>
+        <a href="reports.php?report=booking" class="btn btn-primary">Booking</a>
+        <a href="reports.php?report=services" class="btn btn-primary">Services</a>
+        <a href="reports.php?report=spareparts" class="btn btn-primary">Spare Parts</a>
+        <a href="reports.php?report=profitloss" class="btn btn-success">Profit & Loss</a>
     </div>
-
-    <!-- Filters Row in a Professional Box -->
-    <div class="filters-box mb-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <!-- 🔍 Global Search Bar -->
-        <input type="text" id="globalSearch" class="form-control form-control-md" placeholder="🔍 Search Reports...">
-
-        <!-- 📅 Date Filters (Visible only on 'All') -->
-        <div id="dateFilters" class="d-flex align-items-center">
-            <input type="date" id="startDate" class="form-control form-control-md">
-            <input type="date" id="endDate" class="form-control form-control-md">
-        </div>
-
-        <!-- Report Buttons -->
-        <div class="btn-group">
-            <a href="?report=all" class="btn btn-dark btn-sm report-btn <?= $report=='all' ? 'active' : '' ?>">All</a>
-            <a href="?report=services" class="btn btn-primary btn-sm report-btn <?= $report=='services' ? 'active' : '' ?>">Services</a>
-            <a href="?report=spareparts" class="btn btn-success btn-sm report-btn <?= $report=='spareparts' ? 'active' : '' ?>">Spare Parts</a>
-            <a href="?report=cars" class="btn btn-warning btn-sm report-btn <?= $report=='cars' ? 'active' : '' ?>">Cars</a>
-            <a href="?report=sales" class="btn btn-info btn-sm report-btn <?= $report=='sales' ? 'active' : '' ?>">Sales</a>
-            <a href="?report=booking" class="btn btn-secondary btn-sm report-btn <?= $report=='booking' ? 'active' : '' ?>">Booking</a>
-            <a href="?report=customer" class="btn btn-danger btn-sm report-btn <?= $report=='customer' ? 'active' : '' ?>">Customer</a>
-        </div>
+    <!-- Date Filter -->
+    <form method="GET" class="d-flex justify-content-center gap-2 mb-4">
+        <input type="hidden" name="report" value="<?= htmlspecialchars($report) ?>">
+        <input type="date" name="start_date" value="<?= htmlspecialchars($start_date) ?>" class="form-control" style="max-width:200px;">
+        <input type="date" name="end_date" value="<?= htmlspecialchars($end_date) ?>" class="form-control" style="max-width:200px;">
+        <button type="submit" class="btn btn-success">Filter</button>
+    </form>
+    <!-- Table -->
+    <div class="table-responsive" data-aos="fade-up">
+        <table class="table table-bordered table-striped text-center">
+            <thead class="table-dark">
+                <tr>
+                    <?php foreach ($columns as $col): ?>
+                        <th><?= $col ?></th>
+                    <?php endforeach; ?>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if ($report === 'profitloss'): ?>
+                    <?php foreach ($profitLossData as $row): ?>
+                        <tr <?= $row['Category'] === 'TOTAL' ? 'class="table-primary font-weight-bold"' : '' ?>>
+                            <?php foreach ($row as $key => $val): ?>
+                                <td>
+                                    <?php if ($key === 'Revenue' || $key === 'Cost' || $key === 'Commission' || $key === 'Profit/Loss'): ?>
+                                        $<?= number_format($val, 2) ?>
+                                        <?php if ($key === 'Profit/Loss'): ?>
+                                            <span class="badge <?= $val >= 0 ? 'bg-success' : 'bg-danger' ?>">
+                                                <?= $val >= 0 ? 'Profit' : 'Loss' ?>
+                                            </span>
+                                        <?php endif; ?>
+                                    <?php else: ?>
+                                        <?= htmlspecialchars($val) ?>
+                                    <?php endif; ?>
+                                </td>
+                            <?php endforeach; ?>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php elseif ($report === 'cars_profitloss' && isset($result) && mysqli_num_rows($result) > 0): ?>
+                    <?php 
+                    while ($row = mysqli_fetch_assoc($result)): 
+                        // Get car details
+                        $carId = $row['id'];
+                        $sellingPrice = floatval($row['price']); // This is the actual selling price from your database
+                        
+                        // Get actual cost and commission from configuration
+                        if (isset($carFinancials[$carId])) {
+                            $actualCost = $carFinancials[$carId]['cost'];
+                            $commission = $carFinancials[$carId]['commission'];
+                        } else {
+                            // Fallback if not in configuration
+                            $actualCost = $sellingPrice * 0.70;
+                            $commission = $sellingPrice * 0.05;
+                        }
+                        
+                        // Calculate profit/loss
+                        $profitLoss = $sellingPrice - $actualCost - $commission;
+                    ?>
+                        <tr>
+                            <td><?= htmlspecialchars($row['id']) ?></td>
+                            <td><?= htmlspecialchars($row['name']) ?></td>
+                            <td><?= htmlspecialchars($row['model']) ?></td>
+                            <td><?= htmlspecialchars($row['engine_cc']) ?></td>
+                            <td>$<?= number_format($sellingPrice, 2) ?></td>
+                            <td>$<?= number_format($actualCost, 2) ?></td>
+                            <td>$<?= number_format($commission, 2) ?></td>
+                            <td class="<?= $profitLoss >= 0 ? 'text-success' : 'text-danger' ?>">
+                                $<?= number_format($profitLoss, 2) ?>
+                                <?php if ($profitLoss < 0): ?>
+                                    <span class="badge bg-danger">Loss</span>
+                                <?php else: ?>
+                                    <span class="badge bg-success">Profit</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php if (!empty($row['image'])): ?>
+                                    <img src="uploads/<?= htmlspecialchars($row['image']) ?>" 
+                                         alt="Image" 
+                                         style="width:80px; height:80px; object-fit:cover; border-radius:8px;">
+                                <?php endif; ?>
+                            </td>
+                            <td><?= htmlspecialchars($row['added_on'] ?? '') ?></td>
+                        </tr>
+                    <?php endwhile; ?>
+                <?php elseif (isset($result) && mysqli_num_rows($result) > 0): ?>
+                    <?php while ($row = mysqli_fetch_assoc($result)): ?>
+                        <tr>
+                            <?php foreach ($row as $key => $val): ?>
+                                <td>
+                                    <?php if (strtolower($key) === 'image' && !empty($val)): ?>
+                                        <img src="uploads/<?= htmlspecialchars($val) ?>" 
+                                             alt="Image" 
+                                             style="width:80px; height:80px; object-fit:cover; border-radius:8px;">
+                                    <?php else: ?>
+                                        <?= htmlspecialchars($val) ?>
+                                    <?php endif; ?>
+                                </td>
+                            <?php endforeach; ?>
+                        </tr>
+                    <?php endwhile; ?>
+                <?php else: ?>
+                    <tr><td colspan="<?= count($columns) ?>">No records found</td></tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
     </div>
-
-    <div class="accordion" id="reportsAccordion">
-
-    <?php
-    function createProgress($value, $max=1000000, $color='primary') {
-        $percent = min(round(($value/$max)*100), 100) . '%';
-        echo "<div class='alert alert-$color fw-bold' data-aos='flip-left'>Approx. Total Value: <span class='text-dark'>".number_format($value)." PKR</span></div>";
-        echo "<div class='progress' data-aos='zoom-in'><div class='progress-bar bg-$color' role='progressbar' data-width='$percent'>$percent</div></div>";
-    }
-
-    // ================= SECTIONS BELOW (unchanged) =================
-    // Services
-    if($report=='all' || $report=='services'):
-    $total_services_value = rand(10000,50000); ?>
-    <div class="accordion-item mb-3" data-aos="fade-up">
-    <h2 class="accordion-header"><button class="accordion-button" type="button">🛎️ Services Reports</button></h2>
-    <div class="accordion-body">
-    <?php createProgress($total_services_value,50000,'primary'); ?>
-    <div class="card shadow border-0 table-responsive"><table class="table table-hover align-middle">
-    <thead class="table-dark"><tr><th>ID</th><th>Name</th><th>Category</th><th>Description</th><th>Price</th><th>Image</th><th>Created At</th></tr></thead>
-    <tbody>
-    <?php $services = $conn->query("SELECT * FROM services ORDER BY id DESC");
-    while($row = $services->fetch_assoc()){
-    echo "<tr data-aos='fade-up'>
-    <td>{$row['id']}</td><td>{$row['name']}</td><td>{$row['category']}</td>
-    <td>{$row['description']}</td><td>{$row['price']}</td>
-    <td><img src='uploads/{$row['image']}' class='img-thumbnail' style='height:50px;'></td>
-    <td>{$row['created_at']}</td></tr>";
-    } ?>
-    </tbody></table></div></div></div>
+    <!-- Pagination (only for non-profitloss reports) -->
+    <?php if ($report !== 'profitloss' && isset($totalPages)): ?>
+        <div class="d-flex justify-content-center mt-3">
+            <nav>
+                <ul class="pagination">
+                    <?php for ($i = 1; $i <= $totalPages; $i++): ?>
+                        <li class="page-item <?= $i == $page ? 'active' : '' ?>">
+                            <a class="page-link" href="reports.php?report=<?= $report ?>&page=<?= $i ?>&start_date=<?= $start_date ?>&end_date=<?= $end_date ?>"><?= $i ?></a>
+                        </li>
+                    <?php endfor; ?>
+                </ul>
+            </nav>
+        </div>
     <?php endif; ?>
-
-    <!-- Spare Parts -->
-    <?php if($report=='all' || $report=='spareparts'):
-    $total_parts_value = 0;
-    $parts_total_query = $conn->query("SELECT price, stock FROM spare_parts");
-    while($row_total = $parts_total_query->fetch_assoc()){
-    $price = (float) str_replace(',', '', $row_total['price']);
-    $stock = (int) $row_total['stock'];
-    $total_parts_value += $price*$stock;
-    } ?>
-    <div class="accordion-item mb-3" data-aos="fade-up">
-    <h2 class="accordion-header"><button class="accordion-button" type="button">🛠️ Spare Parts Inventory</button></h2>
-    <div class="accordion-body">
-    <?php createProgress($total_parts_value,500000,'success'); ?>
-    <div class="card shadow border-0 table-responsive"><table class="table table-hover align-middle">
-    <thead class="table-dark"><tr><th>ID</th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Image</th></tr></thead>
-    <tbody>
-    <?php $parts = $conn->query("SELECT * FROM spare_parts ORDER BY id DESC");
-    while($row = $parts->fetch_assoc()){
-    echo "<tr data-aos='fade-up'>
-    <td>{$row['id']}</td><td>{$row['name']}</td><td>{$row['category']}</td>
-    <td>{$row['price']}</td><td>{$row['stock']}</td>
-    <td><img src='uploads/{$row['image']}' class='img-thumbnail' style='height:50px;'></td></tr>";
-    } ?>
-    </tbody></table></div></div></div>
-    <?php endif; ?>
-
-    <!-- Cars -->
-    <?php if($report=='all' || $report=='cars'):
-    $total_cars_value = rand(500000,5000000); ?>
-    <div class="accordion-item mb-3" data-aos="fade-up">
-    <h2 class="accordion-header"><button class="accordion-button" type="button">🚗 Cars Reports</button></h2>
-    <div class="accordion-body">
-    <?php createProgress($total_cars_value,5000000,'warning'); ?>
-    <div class="card shadow border-0 table-responsive"><table class="table table-hover align-middle">
-    <thead class="table-dark"><tr><th>ID</th><th>Name</th><th>Model</th><th>Engine CC</th><th>Price</th><th>Image</th><th>Added On</th></tr></thead>
-    <tbody>
-    <?php $cars = $conn->query("SELECT * FROM cars ORDER BY id DESC");
-    while($row = $cars->fetch_assoc()){
-    echo "<tr data-aos='fade-up'>
-    <td>{$row['id']}</td><td>{$row['name']}</td><td>{$row['model']}</td>
-    <td>{$row['engine_cc']}</td><td>{$row['price']}</td>
-    <td><img src='uploads/{$row['image']}' class='img-thumbnail' style='height:50px;'></td>
-    <td>{$row['added_on']}</td></tr>";
-    } ?>
-    </tbody></table></div></div></div>
-    <?php endif; ?>
-
-    <!-- Sales -->
-    <?php if($report=='all' || $report=='sales'):
-    $total_sales_value = rand(50000,1000000); ?>
-    <div class="accordion-item mb-3" data-aos="fade-up">
-    <h2 class="accordion-header"><button class="accordion-button" type="button">💰 Sales Reports</button></h2>
-    <div class="accordion-body">
-    <?php createProgress($total_sales_value,1000000,'info'); ?>
-    <div class="card shadow border-0 table-responsive"><table class="table table-hover align-middle">
-    <thead class="table-dark"><tr><th>ID</th><th>Date</th><th>Name</th><th>Type</th><th>Product</th><th>Price</th><th>Payment Type</th></tr></thead>
-    <tbody>
-    <?php $sales = $conn->query("SELECT * FROM sales ORDER BY id DESC");
-    while($row = $sales->fetch_assoc()){
-    echo "<tr data-aos='fade-up'>
-    <td>{$row['id']}</td><td>{$row['date']}</td><td>{$row['name']}</td>
-    <td>{$row['types']}</td><td>{$row['product']}</td><td>{$row['price']}</td>
-    <td>{$row['pay_type']}</td></tr>";
-    } ?>
-    </tbody></table></div></div></div>
-    <?php endif; ?>
-
-    <!-- Booking -->
-    <?php if($report=='all' || $report=='booking'):
-    $total_booking_value = rand(10000,200000); ?>
-    <div class="accordion-item mb-3" data-aos="fade-up">
-    <h2 class="accordion-header"><button class="accordion-button" type="button">📞 Booking Reports</button></h2>
-    <div class="accordion-body">
-    <?php createProgress($total_booking_value,200000,'secondary'); ?>
-    <div class="card shadow border-0 table-responsive"><table class="table table-hover align-middle">
-    <thead class="table-dark"><tr><th>ID</th><th>Name</th><th>Contact</th><th>Booking Type</th><th>Preferred Time</th><th>Advance Pay</th><th>Pay Mode</th></tr></thead>
-    <tbody>
-    <?php $booking = $conn->query("SELECT * FROM booking ORDER BY id DESC");
-    while($row = $booking->fetch_assoc()){
-    echo "<tr data-aos='fade-up'>
-    <td>{$row['id']}</td><td>{$row['name']}</td><td>{$row['contact']}</td>
-    <td>{$row['booking_type']}</td><td>{$row['pref_time']}</td><td>{$row['adv_pay']}</td>
-    <td>{$row['pay_mode']}</td></tr>";
-    } ?>
-    </tbody></table></div></div></div>
-    <?php endif; ?>
-
-    <!-- Customer -->
-    <?php if($report=='all' || $report=='customer'):
-    $total_customer_value = rand(50000,500000); ?>
-    <div class="accordion-item mb-3" data-aos="fade-up">
-    <h2 class="accordion-header"><button class="accordion-button" type="button">👥 Customer Reports</button></h2>
-    <div class="accordion-body">
-    <?php createProgress($total_customer_value,500000,'danger'); ?>
-    <div class="card shadow border-0 table-responsive"><table class="table table-hover align-middle">
-    <thead class="table-dark"><tr><th>ID</th><th>Name</th><th>Email</th><th>Contact</th><th>Address</th></tr></thead>
-    <tbody>
-    <?php $customers = $conn->query("SELECT * FROM customer ORDER BY id DESC");
-    while($row = $customers->fetch_assoc()){
-    echo "<tr data-aos='fade-up'>
-    <td>{$row['id']}</td><td>{$row['name']}</td><td>{$row['email']}</td>
-    <td>{$row['contact']}</td><td>{$row['address']}</td></tr>";
-    } ?>
-    </tbody></table></div></div></div>
-    <?php endif; ?>
-
-    </div><!-- /accordion -->
 </div>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  AOS.init();
+</script>

@@ -30,7 +30,7 @@ include 'db.php';?>
                         <td>{$row['category']}</td>
                         <td>{$row['description']}</td>
                         <td>" . number_format($row['price'], 2) . "</td>
-                        <td><img src='{$imgPath}' style='width:80px;height:60px;object-fit:cover;border:1px solid #ddd;padding:3px;'></td>
+                        <td><img src='{$imgPath}' style='width:80px;height:60px;object-fit:cover;border:1px solid #ddd;padding:2px;'></td>
                         <td>
                             <a href='edit_service.php?id={$row['id']}' class='btn btn-warning btn-sm'>Edit</a>
                             <a href='delete_service.php?id={$row['id']}' class='btn btn-danger btn-sm' onclick=\"return confirm('Delete this service?');\">Delete</a>

@@ -45,8 +45,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <div class="main-content">
     <h2>Edit Spare Part</h2>
     <form method="POST" enctype="multipart/form-data">
-        <div class="mb-3"><input type="text" name="name" value="<?= $row['name'] ?>" class="form-control" required></div>    
-        <div class="mb-3"><input type="text" name="category" value="<?= $row['category'] ?>" class="form-control" required></div>       
+        <div class="mb-3"><input type="text" name="id" value="<?= $row['id'] ?>" class="form-control" required></div>
+        <div class="mb-3"><input type="text" name="name" value="<?= $row['name'] ?>" class="form-control" required></div>        
+        <div class="mb-3"><input type="text" name="category"value="<?= $row['category'] ?>" class="form-control" required></div>       
         <div class="mb-3"><input type="text" name="price" value="<?= $row['price'] ?>" class="form-control" required></div>       
         <div class="mb-3"><input type="text" name="stock" value="<?= $row['stock'] ?>" class="form-control" required></div>       
         <div class="mb-3"><input type="text" name="image" value="<?= $row['image'] ?>" class="form-control" required></div>

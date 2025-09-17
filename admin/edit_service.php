@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                WHERE id=$id";
 
     if (mysqli_query($conn, $update)) {
-        header("Location: services.php?msg=updated");
+        header("Location:services.php?msg=updated");
         exit;
     } else {
         echo "Error: " . mysqli_error($conn);
@@ -106,7 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
 
         <button type="submit" class="btn btn-primary">Update Service</button>
-        <a href="services.php" class="btn btn-secondary">Cancel</a>
+        <a href="services.php" class="btn btn-secondary">Cancel</a>        
     </form>
 </div>
 
